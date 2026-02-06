@@ -12,7 +12,7 @@ node_modules/
 .DS_Store
 
 
-data/
+
 *.db
 *.db-shm
 *.db-wal
