@@ -1,96 +1,147 @@
-'use client'
+"use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import type { AppData, JourData, Typologie } from './types'
 import {
-  loadData,
-  saveJour as saveJourService,
-  deleteJour as deleteJourService,
-  addTypologie as addTypologieService,
-  updateTypologie as updateTypologieService,
-  deleteTypologie as deleteTypologieService,
-  reorderTypologies as reorderTypologiesService,
-  exportData,
-  importData,
-  resetData as resetDataService,
-  clearAllData as clearAllDataService
-} from './data-service'
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
+import type { AppData, JourData, Typologie } from "./types";
 
 interface DataContextType {
-  data: AppData
-  isLoading: boolean
-  saveJour: (jour: JourData) => void
-  deleteJour: (date: string) => void
-  addTypologie: (typologie: Omit<Typologie, 'id' | 'ordre'>) => void
-  updateTypologie: (typologie: Typologie) => void
-  deleteTypologie: (id: string) => void
-  reorderTypologies: (typologies: Typologie[]) => void
-  exportToJson: () => string
-  importFromJson: (json: string) => boolean
-  resetData: () => void
-  clearAllData: () => void
+  data: AppData;
+  isLoading: boolean;
+  saveJour: (jour: JourData) => Promise<void>;
+  deleteJour: (date: string) => Promise<void>;
+  addTypologie: (typologie: Omit<Typologie, "id" | "ordre">) => Promise<void>;
+  updateTypologie: (typologie: Typologie) => Promise<void>;
+  deleteTypologie: (id: string) => Promise<void>;
+  reorderTypologies: (typologies: Typologie[]) => Promise<void>;
+  exportToJson: () => string;
+  importFromJson: (json: string) => Promise<boolean>;
+  resetData: () => Promise<void>;
+  clearAllData: () => Promise<void>;
 }
 
-const DataContext = createContext<DataContextType | null>(null)
+const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>({
     jours: [],
     typologies: [],
-    version: 1
-  })
-  const [isLoading, setIsLoading] = useState(true)
+    version: 1,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    try {
+      const response = await fetch("/api/data");
+      const newData = await response.json();
+      setData(newData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const loaded = loadData()
-    setData(loaded)
-    setIsLoading(false)
-  }, [])
+    fetchData();
+  }, [fetchData]);
 
-  const saveJour = useCallback((jour: JourData) => {
-    setData(prev => saveJourService(prev, jour))
-  }, [])
+  const apiCall = useCallback(async (action: string, data: any) => {
+    try {
+      const response = await fetch("/api/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, data }),
+      });
+      const newData = await response.json();
+      setData(newData);
+    } catch (error) {
+      console.error(`Error with ${action}:`, error);
+      throw error;
+    }
+  }, []);
 
-  const deleteJour = useCallback((date: string) => {
-    setData(prev => deleteJourService(prev, date))
-  }, [])
+  const saveJour = useCallback(
+    async (jour: JourData) => {
+      await apiCall("saveJour", jour);
+    },
+    [apiCall],
+  );
 
-  const addTypologie = useCallback((typologie: Omit<Typologie, 'id' | 'ordre'>) => {
-    setData(prev => addTypologieService(prev, typologie))
-  }, [])
+  const deleteJour = useCallback(
+    async (date: string) => {
+      await apiCall("deleteJour", date);
+    },
+    [apiCall],
+  );
 
-  const updateTypologie = useCallback((typologie: Typologie) => {
-    setData(prev => updateTypologieService(prev, typologie))
-  }, [])
+  const addTypologie = useCallback(
+    async (typologie: Omit<Typologie, "id" | "ordre">) => {
+      await apiCall("addTypologie", typologie);
+    },
+    [apiCall],
+  );
 
-  const deleteTypologieHandler = useCallback((id: string) => {
-    setData(prev => deleteTypologieService(prev, id))
-  }, [])
+  const updateTypologie = useCallback(
+    async (typologie: Typologie) => {
+      await apiCall("updateTypologie", typologie);
+    },
+    [apiCall],
+  );
 
-  const reorderTypologies = useCallback((typologies: Typologie[]) => {
-    setData(prev => reorderTypologiesService(prev, typologies))
-  }, [])
+  const deleteTypologieHandler = useCallback(
+    async (id: string) => {
+      await apiCall("deleteTypologie", id);
+    },
+    [apiCall],
+  );
+
+  const reorderTypologies = useCallback(
+    async (typologies: Typologie[]) => {
+      await apiCall("reorderTypologies", typologies);
+    },
+    [apiCall],
+  );
 
   const exportToJson = useCallback(() => {
-    return exportData(data)
-  }, [data])
+    return JSON.stringify(data, null, 2);
+  }, [data]);
 
-  const importFromJson = useCallback((json: string) => {
-    const imported = importData(json)
-    if (imported) {
-      setData(imported)
-      return true
-    }
-    return false
-  }, [])
+  const importFromJson = useCallback(
+    async (json: string) => {
+      try {
+        const importedData = JSON.parse(json) as AppData;
+        await apiCall("importData", importedData);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [apiCall],
+  );
 
-  const resetDataHandler = useCallback(() => {
-    setData(resetDataService())
-  }, [])
+  const resetData = useCallback(async () => {
+    await apiCall("importData", {
+      jours: [],
+      typologies: [],
+      version: 1,
+    });
+    await fetchData();
+  }, [apiCall, fetchData]);
 
-  const clearAllDataHandler = useCallback(() => {
-    setData(clearAllDataService())
-  }, [])
+  const clearAllData = useCallback(async () => {
+    await apiCall("importData", {
+      jours: [],
+      typologies: [],
+      version: 1,
+    });
+  }, [apiCall]);
 
   return (
     <DataContext.Provider
@@ -105,19 +156,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
         reorderTypologies,
         exportToJson,
         importFromJson,
-        resetData: resetDataHandler,
-        clearAllData: clearAllDataHandler
+        resetData,
+        clearAllData,
       }}
     >
       {children}
     </DataContext.Provider>
-  )
+  );
 }
 
 export function useData() {
-  const context = useContext(DataContext)
+  const context = useContext(DataContext);
   if (!context) {
-    throw new Error('useData must be used within a DataProvider')
+    throw new Error("useData must be used within a DataProvider");
   }
-  return context
+  return context;
 }

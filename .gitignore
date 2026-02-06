@@ -10,3 +10,9 @@ node_modules/
 .next/
 .env*.local
 .DS_Store
+
+
+data/
+*.db
+*.db-shm
+*.db-wal
