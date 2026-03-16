@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { GripVertical, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Eye, EyeOff, ChevronRight, X } from 'lucide-react'
 import { useData } from '@/lib/data-context'
 import { useIsMobile } from '@/hooks/use-mobile'
-import type { Typologie } from '@/lib/types'
-import { DEFAULT_COLORS } from '@/lib/types'
+import type { Typologie, SousCategorie } from '@/lib/types'
+import { DEFAULT_COLORS, DEFAULT_AGE_SUBCATEGORIES } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,32 @@ import { cn } from '@/lib/utils'
 
 const FAMILLES = ['Créatif', 'Numérique', 'Accueil', 'Autre']
 
+// Preset subcategories
+const PRESET_SUBCATEGORIES = {
+  'ages': {
+    label: 'Tranches d\'âge',
+    items: DEFAULT_AGE_SUBCATEGORIES
+  },
+  'profils': {
+    label: 'Profils',
+    items: [
+      { id: 'prof-1', nom: 'Enfants', ordre: 1 },
+      { id: 'prof-2', nom: 'Adultes', ordre: 2 },
+      { id: 'prof-3', nom: 'Seniors', ordre: 3 },
+      { id: 'prof-4', nom: 'Professionnels', ordre: 4 },
+    ]
+  },
+  'statuts': {
+    label: 'Statuts',
+    items: [
+      { id: 'stat-1', nom: 'Particuliers', ordre: 1 },
+      { id: 'stat-2', nom: 'Chefs d\'entreprise', ordre: 2 },
+      { id: 'stat-3', nom: 'Elus', ordre: 3 },
+      { id: 'stat-4', nom: 'Associations', ordre: 4 },
+    ]
+  }
+}
+
 export function TypologiesTab() {
   const { data, addTypologie, updateTypologie, deleteTypologie, reorderTypologies } = useData()
   const isMobile = useIsMobile()
@@ -58,12 +85,28 @@ export function TypologiesTab() {
   const [showDialog, setShowDialog] = useState(false)
   const [editingTypologie, setEditingTypologie] = useState<Typologie | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [expandedTypologies, setExpandedTypologies] = useState<Set<string>>(new Set())
 
   // Form state
   const [formNom, setFormNom] = useState('')
   const [formCouleur, setFormCouleur] = useState(DEFAULT_COLORS[0])
   const [formActif, setFormActif] = useState(true)
   const [formFamille, setFormFamille] = useState<string>('')
+  const [formSousCategories, setFormSousCategories] = useState<SousCategorie[]>([])
+  const [newSousCatNom, setNewSousCatNom] = useState('')
+
+  // Toggle expansion
+  const toggleExpanded = (id: string) => {
+    setExpandedTypologies(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
 
   // Open dialog for new/edit
   const openDialog = (typologie?: Typologie) => {
@@ -73,14 +116,49 @@ export function TypologiesTab() {
       setFormCouleur(typologie.couleur)
       setFormActif(typologie.actif)
       setFormFamille(typologie.famille || '')
+      setFormSousCategories(typologie.sousCategories ? [...typologie.sousCategories] : [])
     } else {
       setEditingTypologie(null)
       setFormNom('')
       setFormCouleur(DEFAULT_COLORS[data.typologies.length % DEFAULT_COLORS.length])
       setFormActif(true)
       setFormFamille('')
+      setFormSousCategories([])
     }
+    setNewSousCatNom('')
     setShowDialog(true)
+  }
+
+  // Add subcategory
+  const addSousCategorie = () => {
+    if (!newSousCatNom.trim()) return
+    const newSousCat: SousCategorie = {
+      id: crypto.randomUUID(),
+      nom: newSousCatNom.trim(),
+      ordre: formSousCategories.length + 1
+    }
+    setFormSousCategories([...formSousCategories, newSousCat])
+    setNewSousCatNom('')
+  }
+
+  // Remove subcategory
+  const removeSousCategorie = (id: string) => {
+    setFormSousCategories(formSousCategories.filter(sc => sc.id !== id))
+  }
+
+  // Add preset subcategories
+  const addPresetSousCategories = (presetKey: keyof typeof PRESET_SUBCATEGORIES) => {
+    const preset = PRESET_SUBCATEGORIES[presetKey]
+    const existingNames = new Set(formSousCategories.map(sc => sc.nom.toLowerCase()))
+    const newItems = preset.items
+      .filter(item => !existingNames.has(item.nom.toLowerCase()))
+      .map((item, index) => ({
+        ...item,
+        id: crypto.randomUUID(),
+        ordre: formSousCategories.length + index + 1
+      }))
+    setFormSousCategories([...formSousCategories, ...newItems])
+    toast.success(`${newItems.length} sous-catégorie(s) ajoutée(s)`)
   }
 
   // Save typologie
@@ -90,13 +168,19 @@ export function TypologiesTab() {
       return
     }
 
+    const reorderedSousCats = formSousCategories.map((sc, index) => ({
+      ...sc,
+      ordre: index + 1
+    }))
+
     if (editingTypologie) {
       updateTypologie({
         ...editingTypologie,
         nom: formNom.trim(),
         couleur: formCouleur,
         actif: formActif,
-        famille: formFamille || undefined
+        famille: formFamille || undefined,
+        sousCategories: reorderedSousCats.length > 0 ? reorderedSousCats : undefined
       })
       toast.success('Typologie modifiée')
     } else {
@@ -104,7 +188,8 @@ export function TypologiesTab() {
         nom: formNom.trim(),
         couleur: formCouleur,
         actif: formActif,
-        famille: formFamille || undefined
+        famille: formFamille || undefined,
+        sousCategories: reorderedSousCats.length > 0 ? reorderedSousCats : undefined
       })
       toast.success('Typologie créée')
     }
@@ -213,6 +298,76 @@ export function TypologiesTab() {
         />
         <Label htmlFor="actif">Active</Label>
       </div>
+
+      {/* Sous-catégories */}
+      <div className="space-y-3 pt-4 border-t">
+        <div className="flex items-center justify-between">
+          <Label>Sous-catégories</Label>
+          <span className="text-xs text-muted-foreground">{formSousCategories.length} élément(s)</span>
+        </div>
+        
+        {/* Presets */}
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(PRESET_SUBCATEGORIES).map(([key, preset]) => (
+            <Button
+              key={key}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => addPresetSousCategories(key as keyof typeof PRESET_SUBCATEGORIES)}
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              {preset.label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Current subcategories */}
+        {formSousCategories.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {formSousCategories.map(sc => (
+              <Badge
+                key={sc.id}
+                variant="secondary"
+                className="flex items-center gap-1 pr-1"
+              >
+                {sc.nom}
+                <button
+                  type="button"
+                  onClick={() => removeSousCategorie(sc.id)}
+                  className="ml-1 hover:bg-muted rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Add new subcategory */}
+        <div className="flex gap-2">
+          <Input
+            value={newSousCatNom}
+            onChange={(e) => setNewSousCatNom(e.target.value)}
+            placeholder="Nouvelle sous-catégorie..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addSousCategorie()
+              }
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addSousCategorie}
+            disabled={!newSousCatNom.trim()}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   )
 
@@ -225,7 +380,7 @@ export function TypologiesTab() {
             <div>
               <CardTitle className="text-lg">Typologies</CardTitle>
               <CardDescription>
-                {data.typologies.length} typologie(s) • {data.typologies.filter(t => t.actif).length} active(s)
+                {data.typologies.length} typologie(s) - {data.typologies.filter(t => t.actif).length} active(s)
               </CardDescription>
             </div>
             <Button onClick={() => openDialog()}>
@@ -255,90 +410,131 @@ export function TypologiesTab() {
           <CardContent className="pt-6">
             <div className="space-y-2">
               {sortedTypologies.map((typologie, index) => (
-                <div
+                <Collapsible
                   key={typologie.id}
-                  className={cn(
-                    'flex items-center gap-3 p-3 rounded-lg border transition-colors',
-                    !typologie.actif && 'opacity-60 bg-muted/30'
-                  )}
+                  open={expandedTypologies.has(typologie.id)}
+                  onOpenChange={() => toggleExpanded(typologie.id)}
                 >
-                  {/* Drag handle / reorder buttons */}
-                  <div className="flex flex-col gap-0.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={() => moveTypologie(index, 'up')}
-                      disabled={index === 0}
-                    >
-                      <ChevronUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={() => moveTypologie(index, 'down')}
-                      disabled={index === sortedTypologies.length - 1}
-                    >
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </div>
-
-                  {/* Color indicator */}
                   <div
-                    className="w-4 h-4 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: typologie.couleur }}
-                  />
+                    className={cn(
+                      'rounded-lg border transition-colors',
+                      !typologie.actif && 'opacity-60 bg-muted/30'
+                    )}
+                  >
+                    <div className="flex items-center gap-3 p-3">
+                      {/* Drag handle / reorder buttons */}
+                      <div className="flex flex-col gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => moveTypologie(index, 'up')}
+                          disabled={index === 0}
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => moveTypologie(index, 'down')}
+                          disabled={index === sortedTypologies.length - 1}
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                      </div>
 
-                  {/* Name and famille */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{typologie.nom}</span>
-                      {typologie.famille && (
-                        <Badge variant="secondary" className="text-xs">
-                          {typologie.famille}
-                        </Badge>
+                      {/* Expand trigger for subcategories */}
+                      {typologie.sousCategories && typologie.sousCategories.length > 0 && (
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <ChevronRight
+                              className={cn(
+                                'h-4 w-4 transition-transform',
+                                expandedTypologies.has(typologie.id) && 'rotate-90'
+                              )}
+                            />
+                          </Button>
+                        </CollapsibleTrigger>
                       )}
-                      {!typologie.actif && (
-                        <Badge variant="outline" className="text-xs">
-                          Inactive
-                        </Badge>
-                      )}
+
+                      {/* Color indicator */}
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: typologie.couleur }}
+                      />
+
+                      {/* Name and badges */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium truncate">{typologie.nom}</span>
+                          {typologie.famille && (
+                            <Badge variant="secondary" className="text-xs">
+                              {typologie.famille}
+                            </Badge>
+                          )}
+                          {typologie.sousCategories && typologie.sousCategories.length > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {typologie.sousCategories.length} sous-cat.
+                            </Badge>
+                          )}
+                          {!typologie.actif && (
+                            <Badge variant="outline" className="text-xs">
+                              Inactive
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => toggleActive(typologie)}
+                        >
+                          {typologie.actif ? (
+                            <Eye className="h-4 w-4" />
+                          ) : (
+                            <EyeOff className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openDialog(typologie)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirm(typologie.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => toggleActive(typologie)}
-                    >
-                      {typologie.actif ? (
-                        <Eye className="h-4 w-4" />
-                      ) : (
-                        <EyeOff className="h-4 w-4" />
+                    {/* Subcategories display */}
+                    <CollapsibleContent>
+                      {typologie.sousCategories && typologie.sousCategories.length > 0 && (
+                        <div className="px-4 pb-3 pl-16">
+                          <div className="flex flex-wrap gap-2 pt-2 border-t">
+                            {typologie.sousCategories.map(sc => (
+                              <Badge key={sc.id} variant="secondary" className="text-xs">
+                                {sc.nom}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openDialog(typologie)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteConfirm(typologie.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </CollapsibleContent>
                   </div>
-                </div>
+                </Collapsible>
               ))}
             </div>
           </CardContent>
@@ -370,7 +566,7 @@ export function TypologiesTab() {
       {/* Dialog - Desktop */}
       {!isMobile && (
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingTypologie ? 'Modifier la typologie' : 'Nouvelle typologie'}
@@ -395,7 +591,7 @@ export function TypologiesTab() {
       {/* Drawer - Mobile */}
       {isMobile && (
         <Drawer open={showDialog} onOpenChange={setShowDialog}>
-          <DrawerContent>
+          <DrawerContent className="max-h-[85vh]">
             <DrawerHeader>
               <DrawerTitle>
                 {editingTypologie ? 'Modifier la typologie' : 'Nouvelle typologie'}
@@ -404,7 +600,7 @@ export function TypologiesTab() {
                 {editingTypologie ? 'Modifiez les informations de cette typologie.' : 'Créez une nouvelle catégorie de public.'}
               </DrawerDescription>
             </DrawerHeader>
-            <div className="px-4">
+            <div className="px-4 overflow-y-auto">
               <FormContent />
             </div>
             <DrawerFooter>

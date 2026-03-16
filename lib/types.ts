@@ -1,5 +1,12 @@
 // Data types for the attendance management application
 
+// Subcategory for a typologie (e.g., "Enfants", "0-12 ans", "Chef d'entreprise")
+export interface SousCategorie {
+  id: string
+  nom: string
+  ordre: number
+}
+
 export interface Typologie {
   id: string
   nom: string
@@ -7,11 +14,19 @@ export interface Typologie {
   actif: boolean
   ordre: number
   famille?: string
+  sousCategories?: SousCategorie[]
+}
+
+// Count for a subcategory
+export interface SousCategorieCount {
+  sous_categorie_id: string
+  count: number
 }
 
 export interface TypologieCount {
   typologie_id: string
   count: number
+  sousCategories?: SousCategorieCount[]
 }
 
 export interface JourData {
@@ -80,12 +95,66 @@ export const DEFAULT_COLORS = [
   '#84cc16', // lime
 ]
 
+// Default subcategories for age ranges
+export const DEFAULT_AGE_SUBCATEGORIES: SousCategorie[] = [
+  { id: 'age-1', nom: '0-12 ans', ordre: 1 },
+  { id: 'age-2', nom: '13-17 ans', ordre: 2 },
+  { id: 'age-3', nom: '18-25 ans', ordre: 3 },
+  { id: 'age-4', nom: '26-59 ans', ordre: 4 },
+  { id: 'age-5', nom: '60+ ans', ordre: 5 },
+]
+
 // Default typologies
 export const DEFAULT_TYPOLOGIES: Typologie[] = [
-  { id: '1', nom: 'Fablab', couleur: '#10b981', actif: true, ordre: 1, famille: 'Numérique' },
-  { id: '2', nom: 'Céramiste', couleur: '#3b82f6', actif: true, ordre: 2, famille: 'Créatif' },
-  { id: '3', nom: 'Atelier couture', couleur: '#f59e0b', actif: true, ordre: 3, famille: 'Créatif' },
-  { id: '4', nom: 'Visiteur', couleur: '#8b5cf6', actif: true, ordre: 4, famille: 'Accueil' },
+  { 
+    id: '1', 
+    nom: 'Fablab', 
+    couleur: '#10b981', 
+    actif: true, 
+    ordre: 1, 
+    famille: 'Numérique',
+    sousCategories: [
+      { id: 'fab-1', nom: 'Enfants', ordre: 1 },
+      { id: 'fab-2', nom: 'Adultes', ordre: 2 },
+      { id: 'fab-3', nom: 'Professionnels', ordre: 3 },
+    ]
+  },
+  { 
+    id: '2', 
+    nom: 'Céramiste', 
+    couleur: '#3b82f6', 
+    actif: true, 
+    ordre: 2, 
+    famille: 'Créatif',
+    sousCategories: DEFAULT_AGE_SUBCATEGORIES
+  },
+  { 
+    id: '3', 
+    nom: 'Atelier couture', 
+    couleur: '#f59e0b', 
+    actif: true, 
+    ordre: 3, 
+    famille: 'Créatif',
+    sousCategories: [
+      { id: 'cout-1', nom: 'Mamans', ordre: 1 },
+      { id: 'cout-2', nom: 'Enfants', ordre: 2 },
+      { id: 'cout-3', nom: 'Seniors', ordre: 3 },
+    ]
+  },
+  { 
+    id: '4', 
+    nom: 'Visiteur', 
+    couleur: '#8b5cf6', 
+    actif: true, 
+    ordre: 4, 
+    famille: 'Accueil',
+    sousCategories: [
+      { id: 'vis-1', nom: 'Particuliers', ordre: 1 },
+      { id: 'vis-2', nom: 'Chefs d\'entreprise', ordre: 2 },
+      { id: 'vis-3', nom: 'Elus', ordre: 3 },
+      { id: 'vis-4', nom: 'Groupes scolaires', ordre: 4 },
+    ]
+  },
   { id: '5', nom: 'Coworking', couleur: '#ec4899', actif: true, ordre: 5, famille: 'Numérique' },
 ]
 
