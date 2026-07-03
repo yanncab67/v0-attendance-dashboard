@@ -63,7 +63,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const FAMILLES = ["Créatif", "Numérique", "Accueil", "Autre", "test"];
+const FAMILLES = ["Fablab", "Ateliers & Pratiques créatives", "Evènementiel & privatisation", "Réseaux & réunions", "Hors-les-murs","Visite & accueil","Vie interne / équipe"];
 
 // Form content component (défini en dehors pour éviter les re-renders)
 function FormContent({
